@@ -150,7 +150,7 @@ cp .env.example .env
 # 編輯 .env，填入上面拿到的各組 token
 
 # 跑一次看看
-uv run python v3_daily_signal.py
+uv run python main.py
 ```
 
 成功的話，你的 Telegram 會收到選股通知，Google Sheet 的 Signals 分頁會出現新資料。
@@ -246,7 +246,7 @@ ROE > 15%   # 股東權益報酬率
 
 ### 調整參數
 
-修改 `v3_daily_signal.py` 頂部的 `CONFIG`：
+修改 `stock_strategies/config.py` 裡的 `CONFIG`：
 
 ```python
 CONFIG = {
@@ -266,13 +266,13 @@ CONFIG = {
 **加入新技術指標（以 RSI 為例）**
 
 ```python
-# 在 add_indicators() 裡新增
+# 在 stock_strategies/indicators.py 的 add_indicators() 裡新增
 delta = df["close"].diff()
 gain = delta.where(delta > 0, 0).rolling(14).mean()
 loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
 df["rsi"] = 100 - (100 / (1 + gain / loss))
 
-# 在 tech_score_at() 裡新增評分邏輯
+# 在同一個檔案的 tech_score_at() 裡新增評分邏輯
 if pd.notna(row.get("rsi")) and 30 < row["rsi"] < 70:
     score += 20
     signals.append("RSI 中性區")
@@ -281,7 +281,7 @@ if pd.notna(row.get("rsi")) and 30 < row["rsi"] < 70:
 **調整評分權重**
 
 ```python
-# evaluate() 裡的綜合分公式
+# stock_strategies/evaluate.py 裡的綜合分公式
 signal_score = round(
     0.3 * fund_score +   # 基本面 30%
     0.3 * tech_score +   # 技術面 30%
@@ -326,11 +326,19 @@ signal_score = round(
 
 ```
 stock-strategies-only/
-├── v3_daily_signal.py     # 主程式（選股引擎 + 通知 + Sheet 讀寫）
-├── pyproject.toml         # Python 依賴管理（uv）
-├── uv.lock                # 鎖定版本
-├── daily.yml              # GitHub Actions workflow（複製到 .github/workflows/）
-├── .env.example           # 環境變數範本
+├── main.py                    # 入口（串接整個流程）
+├── stock_strategies/
+│   ├── config.py              # 策略參數 & 常數
+│   ├── sheet.py               # Google Sheet 讀寫
+│   ├── data.py                # FinMind API 資料抓取
+│   ├── indicators.py          # 技術指標計算 + 評分
+│   ├── backtest.py            # 歷史回測
+│   ├── evaluate.py            # 綜合評估（組合以上模組）
+│   └── notify.py              # Telegram 格式化 + 發送
+├── pyproject.toml             # Python 依賴管理（uv）
+├── uv.lock                    # 鎖定版本
+├── daily.yml                  # GitHub Actions workflow
+├── .env.example               # 環境變數範本
 └── README.md
 ```
 
@@ -348,7 +356,7 @@ stock-strategies-only/
 <details>
 <summary><b>可以用其他資料源取代 FinMind 嗎？</b></summary>
 
-可以。只需要改 `fetch_finmind()`、`get_price_history()`、`get_fundamental()` 三個函式，回傳格式一樣就行。常見替代：[TWSE OpenData](https://openapi.twse.com.tw/)、Yahoo Finance（需額外套件）。
+可以。只需要改 `stock_strategies/data.py` 裡的三個函式，回傳格式一樣就行。常見替代：[TWSE OpenData](https://openapi.twse.com.tw/)、Yahoo Finance（需額外套件）。
 
 </details>
 
@@ -362,7 +370,7 @@ Private repo 每月免費 2000 分鐘，這個 workflow 每次約 2 分鐘，每
 <details>
 <summary><b>想用 LINE Notify 而不是 Telegram？</b></summary>
 
-改寫 `send_telegram()` 函式，換成 LINE Notify API 即可，核心邏輯完全不用動。
+改寫 `stock_strategies/notify.py` 裡的 `send_telegram()` 函式，換成 LINE Notify API 即可，其他模組完全不用動。
 
 </details>
 
