@@ -21,3 +21,7 @@ speech-to-text-*.json
 
 # FinMind 本地快取（parquet）
 .cache/
+
+credentials.json
+
+credentials.json
